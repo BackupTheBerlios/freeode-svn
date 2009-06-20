@@ -1,0 +1,138 @@
+#    Copyright (C) 2009 by Eike Welk
+#    eike.welk@post.rwth-aachen.de
+
+
+
+#I just checked the correctness of the formulas with a textbook, when I
+#realized that the derivation of the formula for the flowrate is really
+#simple. I wrote a detailed derivation in this file because I remembered
+#that I liked it when I took a fluid mechanics class myself. (Eike)
+
+
+
+#Tank with hole in the wall, and constant inflow.
+#After some time a constant water level will be reached.
+#
+#Sketch:
+#
+#       |                |
+#       |~~~~~~~~~~~~~~~~|  --------------------------
+#       | ~ ~ ~ ~ ~ ~ ~ ~|           ^            ^
+#       |~ ~~~~~~~~~~~ ~ |           |            |
+#       | ~ water tank  ~|           |            |
+#       |~ ~~~~~~~~~~~ ~ |           z            |
+#       | ~ ~ ~ ~ ~ ~ ~ ~|           |            |
+#       |~ ~ ~ ~ ~ ~ ~ ~ |           |            |
+#       | ~ ~ ~~~~~~  ~ ~|           v   water    h
+#       |~ ~ ~ hole ---> ~~~.  <---------flowing  |
+#       | ~ ~ ~~~~~~  ~ ~|   ~       ^   out      |
+#       |~ ~ ~ ~ ~ ~ ~ ~ |    ~      |            |
+#       | ~ ~ ~ ~ ~ ~ ~ ~|    ~    h_out          |
+#       |~ ~ ~ ~ ~ ~ ~ ~ |  . ~ .    |            |
+#       | ~ ~ ~ ~ ~ ~ ~ ~| ~~~~~ ~   v            v
+#=====================================================
+#
+#
+#The formula to compute the outflow through the hole is derived from the
+#Bernoulli law, which is this formula:
+#
+#  g*z + p/rho + c**2/2 = const
+#
+# g     : gravitational acceleration
+# z     : height of fluid particle (above center of hole in this derivation)
+# p     : pressure at particle's position
+# rho   : density of fluid
+# c     : speed of particle
+# const : This constant is the same for all particles in the fluid.
+#
+#The Bernoulli law really is just the law of conservation of energy in a
+#cleverly rewritten form, with quantities that are interesting for fluid
+#mechanics. It states that the particles in a connected body of fluid all
+#have the same energy; if friction is unimportant.
+#
+#
+#For ease of writing the formula the pressure of the surrounding air is thought
+#to be zero.
+#
+#For deriving the formula two particles (molecules) of water are examined: one
+#particle at the surface of the water and another particle in the center of the
+#hole.
+#1: At the surface of the water the pressure and speed are zero. The Bernoulli
+#   law for a particle at the surface therefore simplifies to:
+#       g*z = const
+#
+#2: In hole the pressure is zero, because it is in contact to the surrounding;
+#   and the height is also zero. The particle in the hole however has a
+#   nonzero speed, which is currently unknown.
+#   For a particle in the hole the Bernoulli law simplifies to:
+#       c**2/2 = const
+#
+#As the constant is the same for all particles, one can also write:
+#       g*z = c**2/2
+#
+#This equation can be rearranged to compute the speed of the water in the hole:
+#       c = sqrt(2*g*z)
+#
+#(This is interestingly the speed that a body (stone) would have if it fell
+#from the height z.) With the diameter of the hole and the speed of the water
+#in the hole one can compute the flow rate. As there is really an important
+#amount of friction present, the flow rate is multiplied by a correction
+#value mu.
+#
+#Flow rate:
+#       q_out = mu * A_out * c
+#
+#Substitute the speed of the particles in the hole:
+#
+#       q_out = mu * A_out * sqrt(2*g*z)
+#
+# q_out : flowrate of water out of the hole
+# mu    : correction factor for friction
+# A_out : diameter of hole
+# g     : gravitational acceleration
+# z     : water level above center of hole.
+#
+#This formula is used in the simulation program.
+#
+
+
+
+data g, rho: Float const
+#gravitational acceleration
+g = 9.81 #[m/s**2]
+
+#Tank with hole at height h_out
+class Tank:
+    data V, h, q_out: Float
+    data A_bott, A_out, h_out, mu, q_in: Float param
+
+
+    func dynamic(this):
+        h = V/A_bott #[m]
+        if h > h_out:
+            q_out = mu*A_out*sqrt(2*g*(h-h_out)) #hole at height h_out
+        else:
+            q_out = 0
+
+        $V = q_in - q_out
+        #print('h: ', h, 'time: ', time)
+
+
+    func initialize(this):
+        V = 0
+        A_bott = 0.09   # [m**2]   = 30*30 cm**2
+        A_out  = 0.0002 # [m**2]   = 1*2 cm**2
+        h_out  = 0.3    # [m]      = 30 cm
+        mu     = 0.55   # [1]
+        q_in   = 0.0001 # [m**3/s] = 0.1 l/s
+        #duration of simulation, interval at which values are stored; both in [s]
+        solution_parameters(duration=600, reporting_interval=1)
+
+
+    func final(this):
+        #save('fill-tank')
+        graph(h, q_out)
+
+
+
+compile Tank
