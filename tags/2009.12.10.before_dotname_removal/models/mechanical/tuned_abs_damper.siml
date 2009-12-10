@@ -1,0 +1,240 @@
+# Simulation of a Tuned Mass Damper
+# And of a Dynamic Absorber (which I don'T quite understand)
+#
+#
+#
+#   x1                x2
+#-------->|      |-------->|
+#         |      |         |
+#
+#         |-> Fe
+#         +------+   c2    +------+
+#         |      |/\/\/\/\/|      |
+#         |      |   d2    |      |
+#   c1    |      | |-----  |  m2  | Tuned Damper
+#/\/\/\/\/|      |=|   ]===|      |  (same resonance as structure, high damping)
+#         |      | |-----  |      |
+#         |  m1  |         +------+
+#   d1    |      |
+# |-----  |vibra-|   c3    +------+
+#=|   ]===|ting  |/\/\/\/\/|      |
+# |-----  |struc-|   d3    |      |
+#         |ture  | |-----  |  m3  | Dynamic absorber
+#         |      |=|   ]===|      |  (higher resonance frequency, low damping)
+#         |      | |-----  |      |
+#         +------+         +------+
+#
+#
+#                |   x3    |
+#                |-------->|
+#
+#
+#
+# Usually: m2 = 0.01...0.05 m1
+#
+# omega = sqrt(c/m)  :circular frequency
+# sigma = d/m         :energy loss
+#
+# D = d/sqrt(c*m)     :damping
+# if D>1 then: damping is strong
+
+
+
+data pi: Float const
+pi = 3.1415
+
+
+
+#create vibration with linearly increasing frequency
+#output x
+class FrequencySweepGenerator:
+    data fMin, fMax, rampDuration: Float param
+    data x, frequ: Float
+
+    func dynamic(this):
+        frequ = fMin + time*(fMax-fMin)/rampDuration
+        x = sin(time*2*pi*frequ)
+
+
+    func initialize(this):
+        fMin = 1
+        fMax = 10
+        rampDuration = 100
+
+
+
+#  class ResonatorSingle:
+#      data c, d, m: Float param
+#      #Damp, omega: Float param
+#      data x, v: Float    #state variables
+#      data F: Float #external force
+#
+#      func dynamic():
+#          $v = (-c*x - d*v + F)/m
+#          $x = v
+#
+#
+#      func initialize():
+#          m = 1 c = 1 d = 0
+#          #Damp = d/sqrt(c*m) #damping
+#          #omega = sqrt(c/m)  #circular frequency
+#          x = 0
+#          v = 0
+#
+#
+
+
+# A system that can oscillate consisting of two masses
+#    1.: m  : attached to the ground with spring and damper
+#             excited by the force F
+#    2.: m2 : attached to m with spring and damper
+#
+# m2 will be used as a tuned mass damper for m
+class Resonator2Mass:
+    data c, d, m: Float param
+    data x, v: Float    #state variables
+    data F: Float #external force
+
+    #Damper
+    data c2, d2, m2: Float param
+    data x2, v2: Float    #state variables
+
+    func dynamic(this):
+        $v = (-c*x - d*v + F + c2*(x2-x) + d2*(v2-v))/m
+        $x = v
+
+        $v2 = (-c2*(x2-x) - d2*(v2-v))/m2
+        $x2 = v2
+
+
+    func initialize(this):
+        m = 1; c = 1; d = 0
+        x = 0; v = 0
+
+        m2 = 1; c2 = 1; d2 = 0
+        x2 = 0; v2 = 0
+
+
+
+
+# The tuned mass damper in action.
+# r.m has very low damping and is excited by an external, oscillating force
+# r.m2 is only 2% of m. It has same resonance frequency but much more damping
+#
+# The presence of m2 reduces the oscillations of m by a factor of 5.
+# The oscillating force slowly changes its frequency.
+class Experiment0:
+    data sweep: FrequencySweepGenerator
+    data AmpFe, duration: Float param
+    data r: Resonator2Mass
+
+
+    func dynamic(this):
+        sweep.dynamic()
+        r.F = AmpFe*sweep.x
+        r.dynamic()
+
+
+    func initialize(this):
+        duration = 200
+        solution_parameters(duration=duration, reporting_interval=0.01)
+
+        #the excitation force
+        sweep.initialize()
+        sweep.fMin = 0.80; sweep.fMax=1.15
+        sweep.rampDuration = duration
+        AmpFe = 10 #force's amplitude
+
+        #the vibrating system
+        r.initialize()
+        # omega = sqrt(c/m)  :circular frequency
+        # sigma = d/m         :energy loss
+        #the vibrating structure
+        r.m = 100; r.c = 5000; r.d = 2
+        #the tuned damper. low weight, same omega as m, but more enery loss
+        r.m2 = 2.1; r.c2 = 100; r.d2 = 2.2
+
+
+    func final(this):
+        #graph(r.x)
+        graph(r.x, r.x2)
+        graph(sweep.frequ)
+
+
+
+
+# Same system as Experiment0 but no tuned mass damper
+#
+# spring constant and damper constant of m2 are 0
+# so no interaction between m and m2
+class Experiment1:
+    data sweep: FrequencySweepGenerator
+    data AmpFe, duration :Float param
+    data r: Resonator2Mass
+
+
+    func dynamic(this):
+        sweep.dynamic()
+        r.F = AmpFe*sweep.x
+        r.dynamic()
+
+
+    func initialize(this):
+        duration = 200
+        solution_parameters(duration=duration, reporting_interval=0.01)
+
+        sweep.initialize()
+        sweep.fMin = 0.80; sweep.fMax=1.15;
+        sweep.rampDuration = duration
+        AmpFe = 10
+
+        r.initialize()
+        #the vibrating structure
+        r.m = 100; r.c = 5000; r.d = 2
+        #placeholder for tuned damper
+        # spring constant and damper constant of m2 are 0
+        # so no interaction between m and m2
+        r.m2 = 1; r.c2 = 0; r.d2 = 0
+
+
+    func final(this):
+        #graph r.x
+        graph(r.x, r.x2)
+        #graph sweep.frequ
+
+
+
+
+#Step experiment.
+#The resonance frequency and the low damping can be seen.
+#the experiment is conducted with no tuned damper
+class StepExperiment:
+    data r: Resonator2Mass
+
+    func dynamic(this):
+        r.F = 0
+        r.dynamic()
+
+
+    func initialize(this):
+        solution_parameters(duration=20, reporting_interval=0.01)
+
+        r.initialize()
+        #the vibrating structure
+        r.m = 100; r.c = 5000; r.d = 2
+        #placeholder for tuned damper
+        # spring constant and damper constant of m2 are 0
+        # so no interaction between m and m2
+        r.m2 = 1; r.c2 = 0; r.d2 = 0
+        #start with initial amplitude (but no initial velocity)
+        r.x = 1
+
+
+    func final(this):
+        graph(r.x, r.x2)
+
+
+
+compile Experiment0
+compile Experiment1
+compile StepExperiment
